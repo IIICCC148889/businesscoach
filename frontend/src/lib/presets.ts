@@ -1,0 +1,33 @@
+import { SetupConfig } from './types';
+
+export const defaultConfig: SetupConfig = {
+  businessName: 'ProfitLab Model',
+  businessType: 'Custom',
+  strategy: 'Balanced',
+  currencyCode: 'USD',
+  startingCash: 90000,
+  launchMonth: '2026-04',
+  region: 'Almaty',
+  timeHorizon: 12,
+  averagePrice: 48,
+  traffic: 3600,
+  conversionRate: 0.12,
+  repeatPurchaseRate: 0.22,
+  monthlyGrowthRate: 0.035,
+  referralRate: 0.04,
+  rent: 4200,
+  salaries: 9800,
+  utilities: 1100,
+  variableCostPerSale: 14,
+  marketingSpend: 3200,
+  softwareTools: 450,
+  otherFixedCosts: 1300,
+  inflation: 0.012,
+  rentGrowth: 0.015,
+  wageGrowth: 0.012,
+  adCostGrowth: 0.018,
+  demandTrend: 0.018,
+  competitionPressure: 0.09,
+  seasonalityStrength: 0.08,
+  currencyRisk: 0.04
+};
