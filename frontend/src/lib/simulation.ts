@@ -1,25 +1,49 @@
 import { ScenarioResult, SetupConfig } from './types';
 
-const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
-const seasonalityFactor = (month: number, strength: number) => 1 + Math.sin((month / 12) * Math.PI * 2) * strength;
+const clamp = (value: number, min: number, max: number) =>
+  Math.min(max, Math.max(min, value));
+
+const seasonalityFactor = (month: number, strength: number) =>
+  1 + Math.sin((month / 12) * Math.PI * 2) * strength;
 
 const buildFounderActions = (summary: ScenarioResult) => {
-  const latest = summary.timeline.at(-1)!;
+  const latest = summary.timeline[summary.timeline.length - 1]!;
   const fixFirst: string[] = [];
   const improveNext: string[] = [];
   const avoidNow: string[] = [];
 
-  if (latest.cashBalance < summary.config.startingCash * 0.5) fixFirst.push('Reduce fixed commitments and preserve cash runway before scaling spend.');
-  if (latest.margin < 0.15) fixFirst.push('Raise contribution margin by revisiting pricing, discounting, or unit costs.');
-  if (summary.sensitivity[0]?.label === 'Conversion') fixFirst.push('Stabilize conversion before making pricing or hiring decisions.');
+  if (latest.cashBalance < summary.config.startingCash * 0.5) {
+    fixFirst.push('Reduce fixed commitments and preserve cash runway before scaling spend.');
+  }
+
+  if (latest.margin < 0.15) {
+    fixFirst.push('Raise contribution margin by revisiting pricing, discounting, or unit costs.');
+  }
+
+  if (summary.sensitivity[0]?.label === 'Conversion') {
+    fixFirst.push('Stabilize conversion before making pricing or hiring decisions.');
+  }
 
   improveNext.push('Build repeat purchase and referral loops to reduce dependence on new traffic.');
   improveNext.push('Stress test rent, ad costs, and demand decline before approving expansion.');
-  if (summary.breakEvenMonth && summary.breakEvenMonth <= summary.config.timeHorizon / 2) improveNext.push('Use early break-even headroom to improve efficiency rather than adding overhead too soon.');
+
+  if (
+    summary.breakEvenMonth &&
+    summary.breakEvenMonth <= summary.config.timeHorizon / 2
+  ) {
+    improveNext.push(
+      'Use early break-even headroom to improve efficiency rather than adding overhead too soon.'
+    );
+  }
 
   avoidNow.push('Do not accelerate hiring before positive operating cash flow is stable.');
   avoidNow.push('Avoid large marketing expansion while payback sensitivity remains unclear.');
-  if (summary.riskLevel === 'High') avoidNow.push('Do not add new fixed-cost obligations until the model survives a moderate demand shock.');
+
+  if (summary.riskLevel === 'High') {
+    avoidNow.push(
+      'Do not add new fixed-cost obligations until the model survives a moderate demand shock.'
+    );
+  }
 
   return {
     fixFirst: fixFirst.slice(0, 3),
@@ -34,10 +58,16 @@ const computeRecommendations = (summary: ScenarioResult): string[] => {
     ...summary.founderActions.improveNext,
     ...summary.founderActions.avoidNow
   ];
+
   return [...new Set(result)].slice(0, 6);
 };
 
-export const runScenario = (id: string, name: string, config: SetupConfig, shockIntensity = 0): ScenarioResult => {
+export const runScenario = (
+  id: string,
+  name: string,
+  config: SetupConfig,
+  shockIntensity = 0
+): ScenarioResult => {
   const timeline = [];
   let cash = config.startingCash;
   let breakEvenMonth: number | null = null;
@@ -47,7 +77,8 @@ export const runScenario = (id: string, name: string, config: SetupConfig, shock
   for (let month = 1; month <= config.timeHorizon; month += 1) {
     const seasonality = seasonalityFactor(month, config.seasonalityStrength);
     const competitionDrag = 1 - config.competitionPressure * 0.08;
-    const demandGrowth = 1 + config.monthlyGrowthRate * (month - 1) + config.demandTrend * (month - 1);
+    const demandGrowth =
+      1 + config.monthlyGrowthRate * (month - 1) + config.demandTrend * (month - 1);
     const shockFactor = month >= 5 ? 1 - shockIntensity * 0.2 : 1;
 
     const traffic = config.traffic * demandGrowth * seasonality * competitionDrag * shockFactor;
@@ -62,20 +93,36 @@ export const runScenario = (id: string, name: string, config: SetupConfig, shock
     const marketing = config.marketingSpend * (1 + config.adCostGrowth * (month - 1));
     const software = config.softwareTools * (1 + config.inflation * 0.25 * (month - 1));
     const otherFixed = config.otherFixedCosts * (1 + config.inflation * 0.5 * (month - 1));
-    const variableCosts = customers * config.variableCostPerSale * (1 + config.inflation + config.currencyRisk * 0.4 * (month - 1));
+    const variableCosts =
+      customers *
+      config.variableCostPerSale *
+      (1 + config.inflation + config.currencyRisk * 0.4 * (month - 1));
 
     const grossProfit = revenue - variableCosts;
-    const netProfit = grossProfit - rent - salaries - utilities - marketing - software - otherFixed;
+    const netProfit =
+      grossProfit - rent - salaries - utilities - marketing - software - otherFixed;
+
     cash += netProfit;
+
     const margin = revenue > 0 ? netProfit / revenue : 0;
     minMargin = Math.min(minMargin, margin);
+
     if (netProfit < 0) lossMonths += 1;
     if (breakEvenMonth === null && netProfit > 0) breakEvenMonth = month;
 
     const notes: string[] = [];
-    if (month === 5 && shockIntensity > 0) notes.push(`Demand shock activated (${Math.round(shockIntensity * 100)}% intensity).`);
-    if (month === 8) notes.push('Price and retention review checkpoint.');
-    if (month === 10) notes.push('Selective marketing push window.');
+
+    if (month === 5 && shockIntensity > 0) {
+      notes.push(`Demand shock activated (${Math.round(shockIntensity * 100)}% intensity).`);
+    }
+
+    if (month === 8) {
+      notes.push('Price and retention review checkpoint.');
+    }
+
+    if (month === 10) {
+      notes.push('Selective marketing push window.');
+    }
 
     timeline.push({
       month,
@@ -93,10 +140,25 @@ export const runScenario = (id: string, name: string, config: SetupConfig, shock
   }
 
   const latest = timeline[timeline.length - 1];
-  const resilienceRaw = 100 - lossMonths * 6 - (cash < 0 ? 25 : 0) - (minMargin < 0.08 ? 18 : 0) - config.competitionPressure * 40;
+  const resilienceRaw =
+    100 -
+    lossMonths * 6 -
+    (cash < 0 ? 25 : 0) -
+    (minMargin < 0.08 ? 18 : 0) -
+    config.competitionPressure * 40;
+
   const resilienceScore = clamp(Math.round(resilienceRaw), 8, 96);
-  const riskLevel = resilienceScore >= 72 ? 'Low' : resilienceScore >= 48 ? 'Moderate' : 'High';
-  const viabilityVerdict = cash > 0 && resilienceScore >= 72 ? 'Viable' : cash > 0 && resilienceScore >= 50 ? 'Viable with Caution' : cash > -config.startingCash * 0.35 ? 'Fragile' : 'Not Viable';
+  const riskLevel =
+    resilienceScore >= 72 ? 'Low' : resilienceScore >= 48 ? 'Moderate' : 'High';
+
+  const viabilityVerdict =
+    cash > 0 && resilienceScore >= 72
+      ? 'Viable'
+      : cash > 0 && resilienceScore >= 50
+        ? 'Viable with Caution'
+        : cash > -config.startingCash * 0.35
+          ? 'Fragile'
+          : 'Not Viable';
 
   const sensitivity = [
     { label: 'Price', impact: Math.round(config.averagePrice * 2.2) },
@@ -108,15 +170,24 @@ export const runScenario = (id: string, name: string, config: SetupConfig, shock
   ].sort((a, b) => b.impact - a.impact);
 
   const mainRisks = [
-    latest.cashBalance < config.startingCash * 0.45 ? 'Weak cash reserve under base progression.' : 'Cash reserve remains defendable in the base path.',
-    latest.margin < 0.12 ? 'Thin margin under stress; the model does not absorb shocks well.' : 'Margin still defendable if conversion remains stable.',
-    config.rent + config.salaries > latest.revenue * 0.55 ? 'High fixed-cost exposure relative to projected revenue.' : 'Fixed-cost load is manageable at current scale.',
-    config.competitionPressure > 0.12 ? 'Demand is vulnerable to competitive pressure.' : 'Competitive pressure remains moderate.'
+    latest.cashBalance < config.startingCash * 0.45
+      ? 'Weak cash reserve under base progression.'
+      : 'Cash reserve remains defendable in the base path.',
+    latest.margin < 0.12
+      ? 'Thin margin under stress; the model does not absorb shocks well.'
+      : 'Margin still defendable if conversion remains stable.',
+    config.rent + config.salaries > latest.revenue * 0.55
+      ? 'High fixed-cost exposure relative to projected revenue.'
+      : 'Fixed-cost load is manageable at current scale.',
+    config.competitionPressure > 0.12
+      ? 'Demand is vulnerable to competitive pressure.'
+      : 'Competitive pressure remains moderate.'
   ];
 
-  const explanation = latest.netProfit >= 0
-    ? `By month ${latest.month}, the model remains viable, but outcome quality depends heavily on conversion discipline, fixed-cost containment, and maintaining demand momentum.`
-    : `By month ${latest.month}, profitability is under pressure because cost growth compounds faster than the revenue base, reducing runway and shock tolerance.`;
+  const explanation =
+    latest.netProfit >= 0
+      ? `By month ${latest.month}, the model remains viable, but outcome quality depends heavily on conversion discipline, fixed-cost containment, and maintaining demand momentum.`
+      : `By month ${latest.month}, profitability is under pressure because cost growth compounds faster than the revenue base, reducing runway and shock tolerance.`;
 
   const baseScenario = {
     id,
@@ -128,18 +199,19 @@ export const runScenario = (id: string, name: string, config: SetupConfig, shock
     viabilityVerdict,
     riskLevel,
     explanation,
-    recommendations: [],
+    recommendations: [] as string[],
     mainRisks,
     sensitivity,
     founderActions: {
-      fixFirst: [],
-      improveNext: [],
-      avoidNow: []
+      fixFirst: [] as string[],
+      improveNext: [] as string[],
+      avoidNow: [] as string[]
     }
   } satisfies ScenarioResult;
 
   baseScenario.founderActions = buildFounderActions(baseScenario);
   baseScenario.recommendations = computeRecommendations(baseScenario);
+
   return baseScenario;
 };
 
@@ -151,6 +223,7 @@ export const buildScenarios = (config: SetupConfig): ScenarioResult[] => {
     marketingSpend: config.marketingSpend * 1.05,
     competitionPressure: Math.max(0, config.competitionPressure - 0.03)
   };
+
   const conservative: SetupConfig = {
     ...config,
     traffic: config.traffic * 0.92,
@@ -158,6 +231,7 @@ export const buildScenarios = (config: SetupConfig): ScenarioResult[] => {
     rentGrowth: config.rentGrowth * 1.15,
     adCostGrowth: config.adCostGrowth * 1.12
   };
+
   const crisis: SetupConfig = {
     ...config,
     traffic: config.traffic * 0.78,
